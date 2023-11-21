@@ -1,0 +1,11 @@
+{
+	"files.associations": {
+		"*.excalidraw": "json",
+		"*.excalidrawlib": "json",
+		"CMakeLists.txt": "cmake",
+		"*.fs": "fsharp",
+		"*.html": "html",
+		"*.ipynb": "python",
+		"stdio.h": "c"
+	}
+}

@@ -1,0 +1,27 @@
+{
+	"configurations": [
+		{
+			"name": "PicoSDK",
+			"compilerPath": "C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe",
+			"intelliSenseMode": "linux-gcc-arm",
+			"cStandard": "c17",
+			"cppStandard": "c++17",
+			"includePath": [
+				"${workspaceFolder}/include",
+				"${workspaceFolder}/src",
+				"${workspaceFolder}/build",
+				"C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/**",
+			],
+			"browse": {
+				"path": [
+					"${workspaceFolder}/include",
+					"${workspaceFolder}/src",
+					"${env:PICO_SDK_DIR}/**",
+					"${workspaceFolder}/**"
+				]
+			}
+		}
+	],
+	"version": 4,
+	"enableConfigurationSquiggles": true
+}
