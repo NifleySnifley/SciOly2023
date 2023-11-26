@@ -43,8 +43,39 @@
 const float MOTOR_KHZ = 30.f;
 const int MOTOR_CYCLES = 4096;
 const float MOTOR_FREQ = MOTOR_KHZ * MOTOR_CYCLES;
+#define PI 3.1415926535
+constexpr float _PI2 = PI / 2.0f;
+constexpr float _2PI = 2.0f * PI;
 
-const float ENC_COUNT2ROT_FAC = 1.f / 700.f;
+// Mechanism Parameters
+/* Units:
+ - Millimeters
+ - Radians
+
+   Conventions:
+ - Positive Y is FORWARDS
+ - Positive X is LEFT
+ - Positive rotation is COUNTERCLOCKWISE, 0 is POSITIVE X
+*/
+const float ODOMETRY_CALIBRATION_FAC = 0.98f * 0.9975f;
+const float ENC_COUNT2ROT_FAC = (1.f / 700.f) * ODOMETRY_CALIBRATION_FAC; // Rot/Count
+const float WHEEL_RADIUS = 40.4f / 2.f; // MM
+const float WHEEL_ROT2MM_FAC = 2 * PI * WHEEL_RADIUS; // MM/Rot
+const float WHEELBASE = 83.4; // MM
+const float WHEELBASE_2 = WHEELBASE / 2.0f; // MM
+
+typedef struct pose_t {
+    float rotation;
+    float x;
+    float y;
+} pose_t;
+
+const float INITIAL_ROTATION = PI / 2.0f;
+const pose_t INITIAL_POSE = (pose_t){
+    .rotation = INITIAL_ROTATION,
+    .x = 0.0f,
+    .y = 0.0f
+};
 
 void set_leds(uint8_t ledval) {
     gpio_put(LED_B, (ledval & 0b0001) ? 1 : 0);
@@ -123,7 +154,7 @@ public:
 
     void stop() {
         pin1.set_bool(true);
-        pin1.set_bool(true);
+        pin2.set_bool(true);
     }
 };
 
@@ -349,7 +380,9 @@ public:
 // Just a container/subsystem, not really any sort of abstraction
 class DistanceSensors {
 public:
+    // LEFT
     VL6180X white;
+    // RIGHT
     VL6180X green;
 
     DistanceSensors() : white(LIDAR_I2C, LIDAR_0_CE, 0x29), green(LIDAR_I2C, LIDAR_1_CE, 0x29) {
@@ -375,18 +408,106 @@ public:
         green.start_measuring();
         white.start_measuring();
     }
+
+    int get_right_distance() {
+        return green.get_range_mm();
+    }
+
+    int get_left_distance() {
+        return white.get_range_mm();
+    }
 };
 
+// Odometry, etc.
+class DriveController {
+    MotorController l, r;
+    Encoder el, er;
+
+
+    float last_el, last_er;
+    uint64_t _last_ts;
+public:
+    pose_t pose;
+
+    DriveController(MotorController m_left, MotorController m_right, Encoder e_left, Encoder e_right) : l(m_left), r(m_right), el(e_left), er(e_right) {
+        last_el = last_er = 0.0f;
+        el.set(0.f);
+        er.set(0.f);
+        _last_ts = time_us_64();
+
+
+        reset_odometry();
+    }
+
+    void reset_odometry() {
+        pose = INITIAL_POSE;
+        last_el = el.get();
+        last_er = er.get();
+    }
+
+    // FIXME: These are the "correct" trigonometric odometry calculations
+    // Using the linear approximation might improve performance since the rp2040 doesn't have a FPU
+    void update_odometry() {
+        float cer = er.get();
+        float cel = el.get();
+        float dr = cer - last_er;
+        float dl = cel - last_el;
+        last_er = cer;
+        last_el = cel;
+
+        float r = 0.0f; // MM
+        bool straight = false; // Flag for if dl == dr
+        if (dl == dr) {
+            straight = true;
+        } else {
+            r = (WHEELBASE_2 * (dl + dr)) / (dl - dr);
+        }
+
+        float theta = 0.0f; // Radians
+        float dx, dy; // MM
+
+        if (straight) {
+            dx = 0.0f; // or dl, just moved forward
+            dy = dr;
+        } else {
+            theta = (dl == 0.0f) ? (dr / (r - WHEELBASE_2)) : (dl / (r + WHEELBASE_2));
+
+            dx = cosf(theta) * r - r;
+            dy = sinf(theta) * r;
+        }
+
+        // dx and dy are relative to the current pose (dy forwards, etc.)
+        // transform them and add to pose
+        float p_angle = pose.rotation - _PI2;
+        float dx_pose_space = dx * cosf(p_angle) - dy * sinf(p_angle);
+        float dy_pose_space = dx * sinf(p_angle) + dy * cosf(p_angle);
+
+        // Update the pose!
+        pose.rotation -= theta;
+        pose.x += dx_pose_space;
+        pose.y += dy_pose_space;
+    }
+};
+
+// HARDWARE MODULES
 MotorController MA(MOT_IA1, MOT_IA2);
 MotorController MB(MOT_IB2, MOT_IB1);
-Encoder EB(ENC_A_B, ENC_A_A, ENC_COUNT2ROT_FAC);
-Encoder EA(ENC_B_A, ENC_B_B, ENC_COUNT2ROT_FAC);
+Encoder EB(ENC_A_B, ENC_A_A, ENC_COUNT2ROT_FAC* WHEEL_ROT2MM_FAC);
+Encoder EA(ENC_B_A, ENC_B_B, ENC_COUNT2ROT_FAC* WHEEL_ROT2MM_FAC);
+DistanceSensors ds;
 
-PIDController pa(5.0f, 0.5f, 0.2f);//(2.0f, 0.5f, 0.2f);
-PIDController pb(5.0f, 0.5f, 0.2f);//(2.0f, 0.5f, 0.2f);
+// SOFTWARE MODULES
+PIDController pangle(1.0f, 0.0f, 0.0f);
 
-bool reserved_addr(uint8_t addr) {
-    return (addr & 0x78) == 0 || (addr & 0x78) == 0x78;
+PIDController pa(2.0f, 0.05f, 0.05f);//(2.0f, 0.5f, 0.2f);
+PIDController pb(2.0f, 0.05f, 0.05f);//(2.0f, 0.5f, 0.2f);
+
+float lerp(float a, float b, float t) {
+    return a + (b - a) * clamp(0.f, 1.f, t);
+}
+
+float sin_profile(float start, float end, float tmax, float t) {
+    return lerp(start, end, 0.5f * (1.f + sinf((PI * (clamp(0.f, tmax, t) - tmax * 0.5f)) / tmax)));
 }
 
 int main() {
@@ -400,23 +521,8 @@ int main() {
     gpio_set_dir(LED_G, GPIO_OUT);
     gpio_set_dir(LED_B, GPIO_OUT);
 
-    pa.reset();
-
-    MA.set(0.0f);
-    MB.set(0.0f);
-
-    // while (true) {
-        // //0.5 * (EA.get() + EB.get());// Fun force feedbackish!
-        // float tgt = time_seconds() * 2.0f;
-        // float out_a = pa.calculate(EA.get(), tgt);
-        // float out_b = pb.calculate(EB.get(), tgt);
-        // MA.set(out_a);
-        // MB.set(out_b);
-        // printf("%.3f, %.3f\n", EA.get(), EB.get());
-    // }
-
-    // gpio_put(LIDAR_0_CE, 0); // Select!
-    // gpio_put(LIDAR_1_CE, 1);
+    gpio_init(START_BTN);
+    gpio_pull_up(START_BTN);
 
     i2c_init(LIDAR_I2C, 100 * 1000);
     gpio_set_function(LIDAR_SDA, GPIO_FUNC_I2C);
@@ -424,44 +530,68 @@ int main() {
     gpio_pull_up(LIDAR_SDA);
     gpio_pull_up(LIDAR_SCL);
 
-    DistanceSensors ds;
+    pa.reset();
+    pb.reset();
     ds.init();
 
+    MA.set(0.0f);
+    MB.set(0.0f);
 
-    while (1) {
+    DriveController drive(MB, MA, EB, EA);
 
+    sleep_ms(100);
 
-        // printf("\nI2C Bus Scan\n");
-        // printf("   0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F\n");
-        // for (int addr = 0; addr < (1 << 7); ++addr) {
-        //     if (addr % 16 == 0) {
-        //         printf("%02x ", addr);
-        //     }
+    while (true) {
+        gpio_put(LED_B, 1);
 
-        //     // Perform a 1-byte dummy read from the probe address. If a slave
-        //     // acknowledges this address, the function returns the number of bytes
-        //     // transferred. If the address byte is ignored, the function returns
-        //     // -1.
+        while (true) {
+            // printf("%d, %d\n", ds.get_left_distance(), ds.get_right_distance());
 
-        //     // Skip over any reserved addresses.
-        //     int ret;
-        //     uint8_t rxdata;
-        //     if (reserved_addr(addr))
-        //         ret = -1;
-        //     else
-        //         ret = i2c_read_blocking(LIDAR_I2C, addr, &rxdata, 1, false);
+            if ((ds.get_left_distance() < 25) || (ds.get_right_distance() < 25)) {
+                sleep_ms(5);
+                if ((ds.get_left_distance() < 25) || (ds.get_right_distance() < 25))
+                    break;
+            }
+        }
+        gpio_put(LED_B, 0);
 
-        //     printf(ret < 0 ? "." : "@");
-        //     printf(addr % 16 == 15 ? "\n" : "  ");
-        // }
+        EA.set(0.0f);
+        EB.set(0.0f);
+        drive.reset_odometry();
 
-        // // printf("Addr reg: %d\n", ds.white.reg_read8(VL6180X_I2C_SLAVE_DEVICE_ADDRESS));
-        // // ds.white.reg_write8(VL6180X_I2C_SLAVE_DEVICE_ADDRESS, 0x30);
-        // // printf("Write\n");
+        float _tinit = time_seconds();
+        while (drive.pose.y <= 2000.f) {
+            // 0.5 * (EA.get() + EB.get());// Fun force feedbackish!
+            float tgt = sin_profile(0.0f, 2001.0f, 20.0f, time_seconds() - _tinit); //time_seconds() * WHEEL_ROT2MM_FAC;
+            float out_a = pa.calculate(EA.get(), tgt);
+            float out_b = pb.calculate(EB.get(), tgt);
+            MA.set(out_a);
+            MB.set(out_b);
+            drive.update_odometry();
+            printf("%.3f, %.3f, %.3f\n", drive.pose.x, drive.pose.y, drive.pose.rotation);
+            gpio_put(LED_Y, 1);
+            gpio_put(LED_G, 0);
+            // sleep_ms(10);
+        }
 
-        printf("%d, %d\n", ds.green.get_range_mm(), ds.white.get_range_mm());
+        MA.stop();
+        MB.stop();
 
-        // printf("Done.\n");
-        sleep_ms(10);
+        gpio_put(LED_G, 1);
+        gpio_put(LED_Y, 0);
+        gpio_put(LED_R, drive.pose.x > 1005.f);
     }
+
+    while (true) {
+        gpio_put(LED_R, 1);
+    }
+
+    // gpio_put(LIDAR_0_CE, 0); // Select!
+    // gpio_put(LIDAR_1_CE, 1);
+
+
+    // while (1) {
+    //     printf("%d, %d\n", ds.get_left_distance(), ds.get_right_distance());
+    //     sleep_ms(10);
+    // }
 }
