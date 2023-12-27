@@ -6,7 +6,8 @@ project(scioly_bot)
 pico_sdk_init()
 
 add_executable(scioly_bot
-        main.cpp
+        src/main.cpp
+        src/pathing.cpp
         )
 
 pico_generate_pio_header(scioly_bot ${CMAKE_CURRENT_LIST_DIR}/quad.pio)

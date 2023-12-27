@@ -9,6 +9,7 @@
 			"includePath": [
 				"${workspaceFolder}/include",
 				"${workspaceFolder}/src",
+				"${workspaceFolder}/**",
 				"${workspaceFolder}/build",
 				"C:/Program Files/Raspberry Pi/Pico SDK v1.5.1/pico-sdk/**",
 			],
