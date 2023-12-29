@@ -66,14 +66,14 @@ int main(void) {
 	Rectangle bot_tex_rect;
 	bot_tex_rect.x = 0;
 	bot_tex_rect.y = 0;
-	bot_tex_rect.width = bot.width - 1;
-	bot_tex_rect.height = bot.height - 1;
+	bot_tex_rect.width = (float)bot.width;
+	bot_tex_rect.height = (float)bot.height;
 
-	float last_time = GetTime();
+	float last_time = (float)GetTime();
 	bool executing = true;
 
-	float start_time = GetTime();
-	float end_time = GetTime();
+	float start_time = (float)GetTime();
+	float end_time = (float)GetTime();
 
 	// Main game loop
 	while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -85,14 +85,14 @@ int main(void) {
 		mouse_robotspace.x = (mouse.x / (float)screenWidth) * GRID_SIZE_MM;
 		mouse_robotspace.y = ((screenHeight - mouse.y) / (float)screenHeight) * GRID_SIZE_MM;
 
-		float tdelta = GetTime() - last_time;
-		last_time = GetTime();
+		float tdelta = (float)GetTime() - last_time;
+		last_time = (float)GetTime();
 
 		// std::cout << "(" << odometry.pose.x << ", " << odometry.pose.y << ")" << std::endl;
 
 		if (GetKeyPressed() == KEY_R) {
 			controller.reset();
-			start_time = GetTime();
+			start_time = (float)GetTime();
 			executing = true;
 		}
 
@@ -108,7 +108,7 @@ int main(void) {
 			if (executing) {
 				// std::cout << "exec" << std::endl;
 				executing = !controller.execute(mouse_robotspace);
-				end_time = GetTime();
+				end_time = (float)GetTime();
 			}
 			// executing = true;
 
@@ -155,17 +155,17 @@ int main(void) {
 			std::vector<Vector2> spoints;
 
 			const float t_int = path.total_distance() / MAX_SPEED;
-			const int t_frame = path.pathpoints.size() - 1;//(int)((fmodf(GetTime(), t_int) / t_int) * path.pathpoints.size());
-			for (int i = 0; i <= t_frame; ++i) {
+			const size_t t_frame = path.pathpoints.size() - 1;//(int)((fmodf(GetTime(), t_int) / t_int) * path.pathpoints.size());
+			for (size_t i = 0; i <= t_frame; ++i) {
 				spoints.push_back(robot2screenspace(path.pathpoints[i]));
 			}
 
 			// Draw the path
-			DrawSplineLinear(spoints.data(), spoints.size(), 3.0f, PURPLE);
+			DrawSplineLinear(spoints.data(), spoints.size(), 1.0f, PURPLE);
 
 			// Draw the robot along the path
 			{
-				float dist = (fmodf(GetTime(), t_int) / t_int) * path.total_distance();
+				float dist = (fmodf((float)GetTime(), t_int) / t_int) * path.total_distance();
 				// Vector2 position = robot2screenspace(path.point_at_distance(dist));
 				Vector2 position = robot2screenspace(Vec2(odometry.pose.x, odometry.pose.y));
 

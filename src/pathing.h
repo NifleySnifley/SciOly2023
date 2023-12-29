@@ -29,7 +29,7 @@ public:
 	};
 
 	// TODO: Find a way to actually optimize using last guess instead of just cacheing...
-	int find_prev_index(float distance_mm) {
+	size_t find_prev_index(float distance_mm) {
 		static size_t last_result = 0;
 
 		if (distance_mm < 0) {
@@ -38,15 +38,15 @@ public:
 			return -1;
 		}
 
-		int li = clamp((size_t)0, pathpoints.size() - 1, last_result);
-		int ri = clamp((size_t)0, pathpoints.size() - 1, last_result + 1);
+		size_t li = clamp((size_t)0, pathpoints.size() - 1, last_result);
+		size_t ri = clamp((size_t)0, pathpoints.size() - 1, last_result + 1);
 		if (distance_mm >= dist_presum[li] && distance_mm <= dist_presum[ri]) {
 			return last_result;
 		}
 
-		int left = 0;
-		int right = pathpoints.size() - 1;
-		int middle = -1;
+		size_t left = 0;
+		size_t right = pathpoints.size() - 1;
+		size_t middle = -1;
 
 		while (left <= right) {
 			middle = (left + right) / 2; // HACK: opt to bitshift
@@ -74,7 +74,7 @@ public:
 			return pathpoints[0];
 		}
 
-		int pi = find_prev_index(distance_mm);
+		size_t pi = find_prev_index(distance_mm);
 
 		// std::cout << middle << std::endl;
 		// std::cout << "Target: " << distance_mm << ", Real: " << dist_presum[middle] << std::endl;
@@ -91,7 +91,7 @@ public:
 			return pathpoints[1] - pathpoints[0];
 		}
 
-		int pi = find_prev_index(distance_mm);
+		size_t pi = find_prev_index(distance_mm);
 
 		// std::cout << middle << std::endl;
 		// std::cout << "Target: " << distance_mm << ", Real: " << dist_presum[middle] << std::endl;
@@ -148,6 +148,7 @@ public:
 
 		dist_presum.resize(pathpoints.size());
 
+		cusp_indices.push_back(0);
 		for (int i = 1; i < pathpoints.size(); ++i) {
 			// Check for cusp
 			if (i != pathpoints.size() - 1) {
@@ -164,6 +165,9 @@ public:
 			// FIXME: Just for debug!! uses sqrt!!!
 			dist_presum[i] = dist_presum[i - 1] + seglen;
 		}
+
+		cusp_indices.push_back(pathpoints.size() - 1);
+
 		// std::cout << "Total path distance (mm): " << total_distance() << std::endl;
 	}
 };

@@ -109,8 +109,8 @@ public:
 	// WARNING: Uses `sqrtf()`!
 	// This function should be avoided at all costs
 	float norm() {
-		// return 1.0f / q_rsqrt(length_squared());
-		return sqrtf(length_squared());
+		return 1.0f / q_rsqrt(length_squared());
+		// return sqrtf(length_squared());
 	}
 
 	float direction_radians() {
@@ -162,7 +162,7 @@ public:
 
 float time_seconds() {
 #ifdef PICO_FLASH_SIZE_BYTES
-	return (float)(time_us_64()) * (1e-6);
+	return (float)(time_us_64()) * (1e-6f);
 #else
 	return GetTime();
 #endif
@@ -196,7 +196,7 @@ public:
 		float e = (_setpoint - measurement);
 
 		uint64_t now_ts = time_us_64();
-		float dt = (float)(now_ts - _last_ts) * (1e-6);
+		float dt = (float)(now_ts - _last_ts) * (1e-6f);
 
 		float de_dt = (e - _last_e) / dt;
 		_integral += dt * e;

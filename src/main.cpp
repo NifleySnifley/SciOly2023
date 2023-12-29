@@ -11,11 +11,11 @@
 #include "utils.h"
 #include "constants.h"
 #include "hardware.h"
-#include "controller.h"
 #include "pathing.h"
 #include "maze_solving.h"
 #include "pindefs.h"
 #include "subsystems.h"
+#include "controller.h"
 
 // TODO: Check!!!
 const float INITIAL_ROTATION = PI / 2.0f;
@@ -40,10 +40,10 @@ Encoder EA(ENC_B_A, ENC_B_B, ENC_COUNT2ROT_FAC* WHEEL_ROT2MM_FAC);
 DistanceSensors ds;
 
 // SOFTWARE MODULES
-PIDController pangle(1.0f, 0.0f, 0.0f);
+// PIDController pangle(1.0f, 0.0f, 0.0f);
 
-PIDController pa(2.5f, 0.05f, 0.08f);//(2.0f, 0.5f, 0.2f);
-PIDController pb(2.5f, 0.05f, 0.08f);//(2.0f, 0.5f, 0.2f);
+// PIDController pa(2.5f, 0.05f, 0.08f);//(2.0f, 0.5f, 0.2f);
+// PIDController pb(2.5f, 0.05f, 0.08f);//(2.0f, 0.5f, 0.2f);
 
 
 // Max dret/dt is (PI*(end-start))/tmax
@@ -77,12 +77,12 @@ int main() {
     gpio_pull_up(LIDAR_SDA);
     gpio_pull_up(LIDAR_SCL);
 
-    pa.reset();
-    pb.reset();
+    // pa.reset();
+    // pb.reset();
     ds.init();
 
-    MA.set(0.0f);
-    MB.set(0.0f);
+    MA.stop();
+    MB.stop();
 
     Odometry odom(&EB, &EA, INITIAL_POSE);
 
@@ -106,6 +106,8 @@ int main() {
     path.calculate();
     // gpio_put(LED_B, 1);
 
+    PursuitController controller(&path, &odom, &MB, &MA);
+
 
     ///////////////// Control Loop /////////////////
     // TODO: Multicore processing?
@@ -116,7 +118,6 @@ int main() {
 
         while (true) {
             // printf("%d, %d\n", ds.get_left_distance(), ds.get_right_distance());
-
             if ((ds.get_left_distance() < 25) || (ds.get_right_distance() < 25)) {
                 sleep_ms(5);
                 if ((ds.get_left_distance() < 25) || (ds.get_right_distance() < 25))
@@ -127,33 +128,47 @@ int main() {
 
         EA.set(0.0f);
         EB.set(0.0f);
-        odom.reset_odometry();
-        odom.pose = INITIAL_POSE;
-        pa.reset();
-        pb.reset();
 
-        float _tinit = time_seconds();
-        // Calculate the optimal time so that the vehicle maximizes speed given the profile
-        const float tmin = (2000.f * PI) / MAX_SPEED;
-        while (odom.pose.y <= 2000.f) {
-            // 0.5 * (EA.get() + EB.get());// Fun force feedbackish!
-            float tgt = sin_profile(0.0f, 2000.0f, tmin, time_seconds() - _tinit);
-            float out_a = pa.calculate(EA.get(), tgt);
-            float out_b = pb.calculate(EB.get(), tgt);
-            MA.set(out_a);
-            MB.set(out_b);
+        odom.reset_odometry();
+        controller.reset();
+        // pa.reset();
+        // pb.reset();
+
+        do {
             odom.update_odometry();
-            printf("%f, %f\n", EA.get(), tgt);
             gpio_put(LED_Y, 1);
             gpio_put(LED_G, 0);
-        }
+            if (!gpio_get(START_BTN)) {
+                break;
+            }
+            sleep_ms(10);
+            // printf("%.2f, %.2f, %.2f\n", odom.pose.x, odom.pose.y, odom.pose.rotation);
+        } while (!controller.execute(Vec2()));
+
+        // float _tinit = time_seconds();
+        // // Calculate the optimal time so that the vehicle maximizes speed given the profile
+        // const float tmin = (2000.f * PI) / MAX_SPEED;
+        // while (odom.pose.y <= 2000.f) {
+        //     // 0.5 * (EA.get() + EB.get());// Fun force feedbackish!
+        //     float tgt = sin_profile(0.0f, 2000.0f, tmin, time_seconds() - _tinit);
+        //     float out_a = pa.calculate(EA.get(), tgt);
+        //     float out_b = pb.calculate(EB.get(), tgt);
+        //     MA.set(out_a);
+        //     MB.set(out_b);
+        //     odom.update_odometry();
+        //     printf("%f, %f\n", EA.get(), tgt);
+        //     gpio_put(LED_Y, 1);
+        //     gpio_put(LED_G, 0);
+        // }
+
+        /////////////////////////// CONTROL LOOP ///////////////////////////
 
         MA.stop();
         MB.stop();
 
         gpio_put(LED_G, 1);
         gpio_put(LED_Y, 0);
-        gpio_put(LED_R, odom.pose.x > 1005.f);
+        // gpio_put(LED_R, odom.pose.x > 1005.f);
     }
 
     panic();

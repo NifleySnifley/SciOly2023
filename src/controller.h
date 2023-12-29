@@ -21,16 +21,22 @@ public:
 	MotorController* m_left, * m_right;
 	float target_distance = LOOKAHEAD_DIST;
 
-	// PIDController rotation_controller;
+	// FIXME: Calibrate for optimal precision to the end goal!
 
+	// Pursuit controller parameters
 	const float THRESHOLD = 5.0f;
 	const float THRESHOLD_SQ = THRESHOLD * THRESHOLD;
 
 	const float LOOKAHEAD_DIST = 75.0f; // 100mm
 	const float LOOKAHEAD_DIST_SQ = LOOKAHEAD_DIST_SQ * LOOKAHEAD_DIST_SQ; // 100mm
 
-	const float END_THRESHOLD = 50.0f;
+	const float END_THRESHOLD = 80.0f;
 	const float END_THRESHOLD_SQ = END_THRESHOLD * END_THRESHOLD;
+
+	// Throttle ramping (interpolation) control
+	const float MAX_THROTTLE = 0.8f;
+	const float MIN_THROTTLE = 0.2f;
+	const float SLOWDOWN_THRESH = 400.f;
 
 	PursuitController(BSplinePath* path, Odometry* odom, MotorController* left, MotorController* right) : path(path), odom(odom), m_left(left), m_right(right) {
 		reset();
@@ -49,12 +55,16 @@ public:
 		m_right->stop();
 	}
 
-	// TODO: Implement driving to a specific index to make sure not to miss cusp points!;
-	bool drive_to_index(int tgt) {
+	float calculate_throttle() {
+		float dist = 1e20;
+		for (int i : path->cusp_indices) {
+			dist = std::min(dist, std::abs(path->dist_presum[i] - (target_distance - LOOKAHEAD_DIST)));
+		}
 
+		return clamp(MIN_THROTTLE, MAX_THROTTLE, dist / SLOWDOWN_THRESH);
 	}
 
-	// Return true on finish
+	/// Returns `true` on command completion
 	bool execute(Vec2 _debug) {
 		Vec2 target_point = path->point_at_distance(target_distance);
 		float tgt_dist = Vec2::distance(target_point, cur_pos());
@@ -70,7 +80,7 @@ public:
 		DrawCircleV(robot2screenspace(target_point), 5.0f, BLACK);
 #endif
 
-		drive_towards_point(target_point, 1.0f);
+		drive_towards_point(target_point, calculate_throttle());
 
 		if (target_distance >= path->total_distance() && (cur_pos() - target_point).length_squared() <= END_THRESHOLD_SQ) {
 			m_left->stop();
@@ -104,11 +114,9 @@ public:
 
 		float dot = cosf(error);
 
-		// DrawLineEx(robot2screenspace(cur_pos()), robot2screenspace(cur_pos() + Vec2::from_polar(cur_heading + error, 100.0f)), 4.0f, LIGHTGRAY);
-
 		float turncommand = error * TURN_P;
-		m_left->set((-turncommand + dot * dot) * throttle);
-		m_right->set((turncommand + dot * dot) * throttle);
+		m_left->set(clamp(-1.0f, 1.0f, (-turncommand + dot * dot)) * throttle);
+		m_right->set(clamp(-1.0f, 1.0f, (turncommand + dot * dot)) * throttle);
 		return false;
 	}
 };

@@ -35,32 +35,15 @@ const float MAX_SPEED = (WHEEL_ROT2MM_FAC * MAX_RPM) / 60.0f; // MM/s
 
 #define HALF_CELL Vec2(GRIDSQUARE_SIZE_MM * 0.5f)
 
-const std::array<GridSquare, 3> GOALS = { GridSquare(0, 1), GridSquare(2, 3), GridSquare(3, 1) };
-
-// TODO: Get walls from parsing a "ascii art" (string) representation of the
-// field with box drawing characters, etc!
-const std::array<Edge, 9> WALLS = {
-	Edge(0, 1, 0, 2), Edge(1, 0, 1, 1), Edge(1, 1, 2, 1), Edge(2, 1, 2, 2),
-	Edge(3, 0, 3, 1), Edge(1, 2, 1, 3), Edge(1, 3, 2, 3), Edge(2, 3, 3, 3), Edge(2,1,3,1) };
-
-const GridSquare TARGET = GridSquare(1, 3);
-const GridSquare START = GridSquare(1, 0);
-const Vec2 START_POS = (Vec2)START.bottom_left_on_field_mm() + Vec2(HALF_CELL.x, 0.0f);
-
-// TODO: Properly refactor codebase (edge checking) to permit cutting corners (45deg)
-const GridSquare N_OFFSETS[4] = { GridSquare(1, 0), GridSquare(-1, 0),
-								 GridSquare(0, 1), GridSquare(0, -1)
-};
-
-
-/////////////// DEBUGGING /////////////////
-// const std::array<GridSquare, 0> GOALS = { };
+// const std::array<GridSquare, 3> GOALS = { GridSquare(0, 1), GridSquare(2, 3), GridSquare(3, 1) };
 
 // // TODO: Get walls from parsing a "ascii art" (string) representation of the
 // // field with box drawing characters, etc!
-// const std::array<Edge, 0> WALLS = { };
+// const std::array<Edge, 8> WALLS = {
+// 	Edge(0, 1, 0, 2), Edge(1, 0, 1, 1), Edge(1, 1, 2, 1), Edge(2, 1, 2, 2),
+// 	Edge(3, 0, 3, 1), Edge(1, 2, 1, 3), Edge(1, 3, 2, 3), Edge(2, 3, 3, 3) };
 
-// const GridSquare TARGET = GridSquare(1, 2);
+// const GridSquare TARGET = GridSquare(1, 3);
 // const GridSquare START = GridSquare(1, 0);
 // const Vec2 START_POS = (Vec2)START.bottom_left_on_field_mm() + Vec2(HALF_CELL.x, 0.0f);
 
@@ -68,5 +51,22 @@ const GridSquare N_OFFSETS[4] = { GridSquare(1, 0), GridSquare(-1, 0),
 // const GridSquare N_OFFSETS[4] = { GridSquare(1, 0), GridSquare(-1, 0),
 // 								 GridSquare(0, 1), GridSquare(0, -1)
 // };
+
+
+/////////////// DEBUGGING (Mom's course) /////////////////
+const std::array<GridSquare, 3> GOALS = { GridSquare(0,0), GridSquare(0,1), GridSquare(3,0) };
+
+// TODO: Get walls from parsing a "ascii art" (string) representation of the
+// field with box drawing characters, etc!
+const std::array<Edge, 9> WALLS = { Edge(0,0,0,1), Edge(0,1,1,1), Edge(0,2,1,2), Edge(1,0,2,0), Edge(1,1,2,1), Edge(2,0,3,0), Edge(1,3,2,3), Edge(2,3,2,2), Edge(3,1,3,2) };
+
+const GridSquare TARGET = GridSquare(3, 3);
+const GridSquare START = GridSquare(2, 0);
+const Vec2 START_POS = (Vec2)START.bottom_left_on_field_mm() + Vec2(HALF_CELL.x, 0.0f);
+
+// TODO: Properly refactor codebase (edge checking) to permit cutting corners (45deg)
+const GridSquare N_OFFSETS[4] = { GridSquare(1, 0), GridSquare(-1, 0),
+								 GridSquare(0, 1), GridSquare(0, -1)
+};
 
 #endif
