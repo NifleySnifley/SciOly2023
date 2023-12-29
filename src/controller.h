@@ -34,8 +34,8 @@ public:
 	const float END_THRESHOLD_SQ = END_THRESHOLD * END_THRESHOLD;
 
 	// Throttle ramping (interpolation) control
-	const float MAX_THROTTLE = 0.8f;
-	const float MIN_THROTTLE = 0.2f;
+	const float MAX_THROTTLE = 1.0f;
+	const float MIN_THROTTLE = 0.25f;
 	const float SLOWDOWN_THRESH = 400.f;
 
 	PursuitController(BSplinePath* path, Odometry* odom, MotorController* left, MotorController* right) : path(path), odom(odom), m_left(left), m_right(right) {

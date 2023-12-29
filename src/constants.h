@@ -21,7 +21,7 @@ constexpr float _2PI = 2.0f * PI;
  - Positive X is LEFT
  - Positive rotation is COUNTERCLOCKWISE, 0 is POSITIVE X
 */
-const float ODOMETRY_CALIBRATION_FAC = 0.98f * 0.9975f;
+const float ODOMETRY_CALIBRATION_FAC = 0.98f * 0.9975f * 0.99;
 const float ENC_COUNT2ROT_FAC = (1.f / 700.f) * ODOMETRY_CALIBRATION_FAC; // Rot/Count
 const float WHEEL_RADIUS = 40.4f / 2.f; // MM
 const float WHEEL_ROT2MM_FAC = 2 * PI * WHEEL_RADIUS; // MM/Rot

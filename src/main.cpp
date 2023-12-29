@@ -87,12 +87,12 @@ int main() {
     Odometry odom(&EB, &EA, INITIAL_POSE);
 
     ///////////////// Pre-Calculations /////////////////
+    gpio_put(LED_B, 1);
+
     PathFinding p;
     p.calculate();
-    // gpio_put(LED_R, 1);
     p.optimize_routes();
     int pathlen = p.get_full_path();
-    // gpio_put(LED_Y, 1);
 
     std::vector<Vec2> pps;
     pps.push_back(START_POS);
@@ -100,21 +100,18 @@ int main() {
         pps.push_back(tmp[i].bottom_left_on_field_mm() + HALF_CELL);
     }
 
-    // gpio_put(LED_G, 1);
-
     BSplinePath path(pps);
     path.calculate();
-    // gpio_put(LED_B, 1);
 
     PursuitController controller(&path, &odom, &MB, &MA);
 
-
-    ///////////////// Control Loop /////////////////
     // TODO: Multicore processing?
     sleep_ms(100);
 
+    gpio_put(LED_B, 0);
+
     while (true) {
-        gpio_put(LED_B, 1);
+        gpio_put(LED_G, 1);
 
         while (true) {
             // printf("%d, %d\n", ds.get_left_distance(), ds.get_right_distance());
@@ -124,27 +121,10 @@ int main() {
                     break;
             }
         }
-        gpio_put(LED_B, 0);
+        gpio_put(LED_G, 0);
 
-        EA.set(0.0f);
-        EB.set(0.0f);
-
-        odom.reset_odometry();
-        controller.reset();
         // pa.reset();
         // pb.reset();
-
-        do {
-            odom.update_odometry();
-            gpio_put(LED_Y, 1);
-            gpio_put(LED_G, 0);
-            if (!gpio_get(START_BTN)) {
-                break;
-            }
-            sleep_ms(10);
-            // printf("%.2f, %.2f, %.2f\n", odom.pose.x, odom.pose.y, odom.pose.rotation);
-        } while (!controller.execute(Vec2()));
-
         // float _tinit = time_seconds();
         // // Calculate the optimal time so that the vehicle maximizes speed given the profile
         // const float tmin = (2000.f * PI) / MAX_SPEED;
@@ -161,7 +141,27 @@ int main() {
         //     gpio_put(LED_G, 0);
         // }
 
+        EA.set(0.0f);
+        EB.set(0.0f);
+
+        odom.reset_odometry();
+        controller.reset();
+
         /////////////////////////// CONTROL LOOP ///////////////////////////
+
+        gpio_put(LED_Y, 1);
+        gpio_put(LED_G, 0);
+        gpio_put(LED_B, 0);
+        do {
+            odom.update_odometry();
+            if (!gpio_get(START_BTN)) {
+                break;
+            }
+            // sleep_ms(10);
+            // printf("%.2f, %.2f, %.2f\n", odom.pose.x, odom.pose.y, odom.pose.rotation);
+        } while (!controller.execute(Vec2()));
+
+        /////////////////////////// RUN FINISH ///////////////////////////
 
         MA.stop();
         MB.stop();

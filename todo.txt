@@ -1,6 +1,6 @@
-- Create a basic simulation GUI for testing drive controllers
- - Numerical integration 
-- Path following (drive) controller!
-- Starting configuration precision, sensor usage, laser guides
+- Loading map from string!
+
 - IMU usage, sensor fusion for odometry, etc.
+
+- Starting configuration precision, sensor usage, laser guides
 - Additional accuracy? sensors? vision for final target alignment (ESP-cam?)

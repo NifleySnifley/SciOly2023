@@ -131,6 +131,7 @@ public:
 	) : pin_CE(CE), bus(i2c), addr(address) {
 		gpio_init(pin_CE);
 		gpio_set_dir(pin_CE, GPIO_OUT);
+		power(false);
 	}
 
 	void power(bool pow) {
