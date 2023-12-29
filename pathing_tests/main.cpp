@@ -1,16 +1,4 @@
-/*******************************************************************************************
-*
-*   raylib [shapes] example - Cubic-bezier lines
-*
-*   Example originally created with raylib 1.7, last time updated with raylib 1.7
-*
-*   Example licensed under an unmodified zlib/libpng license, which is an OSI-certified,
-*   BSD-like license that allows static linking with closed source software
-*
-*   Copyright (c) 2017-2023 Ramon Santamaria (@raysan5)
-*
-********************************************************************************************/
-
+#define DEBUG_GUI
 extern "C" {
 #include "raylib.h"
 }
@@ -18,16 +6,11 @@ extern "C" {
 #include "constants.h"
 #include "maze_solving.h"
 #include "pathing.h"
-
-const int screenWidth = 800;
-const int screenHeight = 800;
-
-const int GRIDSQUARE_SIZE_SCREEN = screenWidth / GRID_W;
-
-// Robot type vec2 in MM to screen space
-Vector2 robot2screenspace(Vec2 v) {
-	return { screenWidth * (v.x / 2000.f), screenHeight - screenHeight * (v.y / 2000.f) };
-}
+#include "sim_hardware.h"
+#include "subsystems.h"
+#include "controller.h"
+#include "debug.h"
+#include <string>
 
 void drawWall(Edge edge) {
 	Vec2 a = edge.a.bottom_left_on_field_mm() + Vec2(GRIDSQUARE_SIZE_MM / 2.0f);
@@ -48,11 +31,6 @@ int main(void) {
 	SetConfigFlags(FLAG_MSAA_4X_HINT);
 	InitWindow(screenWidth, screenHeight, "SciOly 2024 Robot Tour debug visualizer");
 
-	// Vector2 startPoint = { 30, 30 };
-	// Vector2 endPoint = { (float)screenWidth - 30, (float)screenHeight - 30 };
-	// bool moveStartPoint = false;
-	// bool moveEndPoint = false;
-
 	PathFinding p;
 	p.calculate();
 	p.optimize_routes();
@@ -63,15 +41,39 @@ int main(void) {
 	for (int i = 0; i < pathlen; ++i) {
 		pps.push_back(tmp[i].bottom_left_on_field_mm() + HALF_CELL);
 	}
-	// pps.push_back((Vec2)TARGET.bottom_left_on_field_mm() + HALF_CELL);
 
-	Path path(pps);
+	std::cout << "Waypoints done: " << pathlen << std::endl;
+	BSplinePath path(pps);
 	path.calculate();
 
-	std::cout << "Size: " << path.pathpoints.size() << std::endl;
+	std::cout << "Calculations done! Size: " << path.pathpoints.size() << std::endl;
 
-	SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+	SetTargetFPS(120);               // Set our game to run at 60 frames-per-second
 	//--------------------------------------------------------------------------------------
+
+	// const float INITIAL_ROTATION = PI / 2.0f;
+	MotorController left_motor, right_motor;
+	Encoder left_encoder(&left_motor), right_encoder(&right_motor);
+	Odometry odometry(&left_encoder, &right_encoder, { 0.0f, 0.0f, 0.0f });
+	PursuitController controller(&path, &odometry, &left_motor, &right_motor);
+
+	//--------------------------------------------------------------------------------------
+
+
+	const float BOT_WIDTH = 90.0f;
+	const float BOT_LENGTH = 105.0f;
+	Texture2D bot = LoadTexture("../../bot.png");
+	Rectangle bot_tex_rect;
+	bot_tex_rect.x = 0;
+	bot_tex_rect.y = 0;
+	bot_tex_rect.width = bot.width - 1;
+	bot_tex_rect.height = bot.height - 1;
+
+	float last_time = GetTime();
+	bool executing = true;
+
+	float start_time = GetTime();
+	float end_time = GetTime();
 
 	// Main game loop
 	while (!WindowShouldClose())    // Detect window close button or ESC key
@@ -79,27 +81,38 @@ int main(void) {
 		// Update
 		//----------------------------------------------------------------------------------
 		Vector2 mouse = GetMousePosition();
+		Vec2 mouse_robotspace;
+		mouse_robotspace.x = (mouse.x / (float)screenWidth) * GRID_SIZE_MM;
+		mouse_robotspace.y = ((screenHeight - mouse.y) / (float)screenHeight) * GRID_SIZE_MM;
 
-		// if (CheckCollisionPointCircle(mouse, startPoint, 10.0f) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) moveStartPoint = true;
-		// else if (CheckCollisionPointCircle(mouse, endPoint, 10.0f) && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) moveEndPoint = true;
+		float tdelta = GetTime() - last_time;
+		last_time = GetTime();
 
-		// if (moveStartPoint) {
-		// 	startPoint = mouse;
-		// 	if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) moveStartPoint = false;
-		// }
+		// std::cout << "(" << odometry.pose.x << ", " << odometry.pose.y << ")" << std::endl;
 
-		// if (moveEndPoint) {
-		// 	endPoint = mouse;
-		// 	if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) moveEndPoint = false;
-		// }
-		//----------------------------------------------------------------------------------
+		if (GetKeyPressed() == KEY_R) {
+			controller.reset();
+			start_time = GetTime();
+			executing = true;
+		}
 
-		// Draw
-		//----------------------------------------------------------------------------------
 		BeginDrawing();
 		{
 			ClearBackground(RAYWHITE);
 
+			// Inside drawing!
+			left_motor._simulate(tdelta);
+			right_motor._simulate(tdelta);
+			odometry.update_odometry();
+
+			if (executing) {
+				// std::cout << "exec" << std::endl;
+				executing = !controller.execute(mouse_robotspace);
+				end_time = GetTime();
+			}
+			// executing = true;
+
+			// Draw grid
 			for (int i = 1; i <= 3; ++i) {
 				DrawLineV(
 					robot2screenspace(Vec2(0.0f, i * 500.0f)),
@@ -114,10 +127,12 @@ int main(void) {
 				);
 			}
 
+			// Draw walls (obstructions)
 			for (Edge e : WALLS) {
 				drawWall(e);
 			}
 
+			// Draw goal cells
 			for (GridSquare g : GOALS) {
 				Rectangle rect;
 				rect.x = robot2screenspace(g.bottom_left_on_field_mm()).x + 10.f;
@@ -128,37 +143,46 @@ int main(void) {
 				DrawRectangleLinesEx(rect, 5.0f, GREEN);
 			}
 
+			// Draw  target and start points
 			DrawCircleV(robot2screenspace((Vec2)TARGET.bottom_left_on_field_mm() + HALF_CELL), 10.0f, GREEN);
 			DrawCircleV(robot2screenspace((Vec2)START.bottom_left_on_field_mm() + HALF_CELL), 10.0f, ORANGE);
 
+			// Draw cusp (reversal) points
+			for (int i : path.cusp_indices) {
+				DrawCircleV(robot2screenspace(path.pathpoints[i]), 5.0f, RED);
+			}
+
 			std::vector<Vector2> spoints;
 
-			// for (Vec2 v : path.pathpoints) {
-				// spoints.push_back(robot2screenspace(v));
-			// }
-
-			const float t_int = path.total_distance / MAX_SPEED;
-			for (int i = 0; i <= (int)((fmodf(GetTime(), t_int) / t_int) * path.pathpoints.size()); ++i) {
+			const float t_int = path.total_distance() / MAX_SPEED;
+			const int t_frame = path.pathpoints.size() - 1;//(int)((fmodf(GetTime(), t_int) / t_int) * path.pathpoints.size());
+			for (int i = 0; i <= t_frame; ++i) {
 				spoints.push_back(robot2screenspace(path.pathpoints[i]));
 			}
 
-			DrawSplineLinear(spoints.data(), spoints.size(), 3.0, BLUE);
-			// DrawSplineCatmullRom(spoints.data(), spoints.size(), 3.0, RED);
-			// DrawSplineBasis(spoints.data(), spoints.size(), 3.0, PURPLE);
-			// DrawSplineBezierQuadratic(spoints.data(), spoints.size(), 3.0, PURPLE);
+			// Draw the path
+			DrawSplineLinear(spoints.data(), spoints.size(), 3.0f, PURPLE);
+
+			// Draw the robot along the path
+			{
+				float dist = (fmodf(GetTime(), t_int) / t_int) * path.total_distance();
+				// Vector2 position = robot2screenspace(path.point_at_distance(dist));
+				Vector2 position = robot2screenspace(Vec2(odometry.pose.x, odometry.pose.y));
+
+				// Vec2 dxy_dt = (path.pathpoints[t_frame] - path.pathpoints[t_frame == 0 ? 0 : t_frame - 1]).normalize();
+				// Vec2 dxy_dt = path.dxy_at_distance(dist).normalize();
+				Vec2 dxy_dt = Vec2::from_polar(odometry.pose.rotation, 1.0f);
+
+				Vector2 bot_size_screen = robot2screenspace(Vec2(BOT_WIDTH, GRID_SIZE_MM - BOT_LENGTH));
+
+				Rectangle dst_rect = { position.x, position.y, bot_size_screen.x, bot_size_screen.y };
+
+				DrawTexturePro(bot, bot_tex_rect, dst_rect, { bot_size_screen.x * 0.5f, bot_size_screen.y * 0.5f }, -(dxy_dt.direction_radians() / PI) * 180.f + 90.f, WHITE);
+			}
+			std::string text = std::to_string(end_time - start_time);
+			DrawText(text.c_str(), 5, 5, 24, BLACK);
 		}
 		EndDrawing();
-
-		// DrawText("MOVE START-END POINTS WITH MOUSE", 15, 20, 20, GRAY);
-
-		// // Draw line Cubic Bezier, in-out interpolation (easing), no control points
-		// DrawLineBezier(startPoint, endPoint, 4.0f, BLUE);
-
-		// // Draw start-end spline circles with some details
-		// DrawCircleV(startPoint, CheckCollisionPointCircle(mouse, startPoint, 10.0f) ? 14 : 8, moveStartPoint ? RED : BLUE);
-		// DrawCircleV(endPoint, CheckCollisionPointCircle(mouse, endPoint, 10.0f) ? 14 : 8, moveEndPoint ? RED : BLUE);
-
-		//----------------------------------------------------------------------------------
 	}
 
 	CloseWindow();

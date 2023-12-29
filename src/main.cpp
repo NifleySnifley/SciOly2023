@@ -11,6 +11,19 @@
 #include "utils.h"
 #include "constants.h"
 #include "hardware.h"
+#include "controller.h"
+#include "pathing.h"
+#include "maze_solving.h"
+#include "pindefs.h"
+#include "subsystems.h"
+
+// TODO: Check!!!
+const float INITIAL_ROTATION = PI / 2.0f;
+const pose_t INITIAL_POSE = (pose_t){
+    INITIAL_ROTATION,
+    0.f, //START_POS.x,
+    0.f // START_POS.y
+};
 
 void set_leds(uint8_t ledval) {
     gpio_put(LED_B, (ledval & 0b0001) ? 1 : 0);
@@ -18,81 +31,6 @@ void set_leds(uint8_t ledval) {
     gpio_put(LED_Y, (ledval & 0b0100) ? 1 : 0);
     gpio_put(LED_R, (ledval & 0b1000) ? 1 : 0);
 }
-
-// Odometry, etc.
-class DriveController {
-    MotorController l, r;
-    Encoder el, er;
-
-
-    float last_el, last_er;
-    uint64_t _last_ts;
-public:
-    pose_t pose;
-
-    DriveController(
-        MotorController m_left, MotorController m_right,
-        Encoder e_left, Encoder e_right
-    ) : l(m_left), r(m_right), el(e_left), er(e_right) {
-        last_el = last_er = 0.0f;
-        el.set(0.f);
-        er.set(0.f);
-        _last_ts = time_us_64();
-
-
-        reset_odometry();
-    }
-
-    void reset_odometry() {
-        pose = INITIAL_POSE;
-        last_el = el.get();
-        last_er = er.get();
-    }
-
-    // FIXME: These are the "correct" trigonometric odometry calculations
-    // Using the linear approximation might improve performance since the rp2040 
-    // doesn't have a FPU
-    void update_odometry() {
-        float cer = er.get();
-        float cel = el.get();
-        float dr = cer - last_er;
-        float dl = cel - last_el;
-        last_er = cer;
-        last_el = cel;
-
-        float r = 0.0f; // MM
-        bool straight = false; // Flag for if dl == dr
-        if (dl == dr) {
-            straight = true;
-        } else {
-            r = (WHEELBASE_2 * (dl + dr)) / (dl - dr);
-        }
-
-        float theta = 0.0f; // Radians
-        float dx, dy; // MM
-
-        if (straight) {
-            dx = 0.0f; // or dl, just moved forward
-            dy = dr;
-        } else {
-            theta = (dl == 0.0f) ? (dr / (r - WHEELBASE_2)) : (dl / (r + WHEELBASE_2));
-
-            dx = cosf(theta) * r - r;
-            dy = sinf(theta) * r;
-        }
-
-        // dx and dy are relative to the current pose (dy forwards, etc.)
-        // transform them and add to pose
-        float p_angle = pose.rotation - _PI2;
-        float dx_pose_space = dx * cosf(p_angle) - dy * sinf(p_angle);
-        float dy_pose_space = dx * sinf(p_angle) + dy * cosf(p_angle);
-
-        // Update the pose!
-        pose.rotation -= theta;
-        pose.x += dx_pose_space;
-        pose.y += dy_pose_space;
-    }
-};
 
 // HARDWARE MODULES
 MotorController MA(MOT_IA1, MOT_IA2);
@@ -107,13 +45,6 @@ PIDController pangle(1.0f, 0.0f, 0.0f);
 PIDController pa(2.5f, 0.05f, 0.08f);//(2.0f, 0.5f, 0.2f);
 PIDController pb(2.5f, 0.05f, 0.08f);//(2.0f, 0.5f, 0.2f);
 
-const float INITIAL_ROTATION = PI / 2.0f;
-const pose_t INITIAL_POSE = (pose_t){
-    INITIAL_ROTATION,
-    0.0f,
-    0.0f
-};
-
 
 // Max dret/dt is (PI*(end-start))/tmax
 float sin_profile(float start, float end, float tmax, float t) {
@@ -125,6 +56,7 @@ float sin_profile(float start, float end, float tmax, float t) {
 }
 
 int main() {
+    ///////////////// Hardware Init /////////////////
     stdio_init_all();
     gpio_init(LED_R);
     gpio_init(LED_Y);
@@ -134,6 +66,7 @@ int main() {
     gpio_set_dir(LED_Y, GPIO_OUT);
     gpio_set_dir(LED_G, GPIO_OUT);
     gpio_set_dir(LED_B, GPIO_OUT);
+    set_leds(0);
 
     gpio_init(START_BTN);
     gpio_pull_up(START_BTN);
@@ -151,8 +84,31 @@ int main() {
     MA.set(0.0f);
     MB.set(0.0f);
 
-    DriveController drive(MB, MA, EB, EA);
+    Odometry odom(&EB, &EA, INITIAL_POSE);
 
+    ///////////////// Pre-Calculations /////////////////
+    PathFinding p;
+    p.calculate();
+    // gpio_put(LED_R, 1);
+    p.optimize_routes();
+    int pathlen = p.get_full_path();
+    // gpio_put(LED_Y, 1);
+
+    std::vector<Vec2> pps;
+    pps.push_back(START_POS);
+    for (int i = 0; i < pathlen; ++i) {
+        pps.push_back(tmp[i].bottom_left_on_field_mm() + HALF_CELL);
+    }
+
+    // gpio_put(LED_G, 1);
+
+    BSplinePath path(pps);
+    path.calculate();
+    // gpio_put(LED_B, 1);
+
+
+    ///////////////// Control Loop /////////////////
+    // TODO: Multicore processing?
     sleep_ms(100);
 
     while (true) {
@@ -171,21 +127,22 @@ int main() {
 
         EA.set(0.0f);
         EB.set(0.0f);
-        drive.reset_odometry();
+        odom.reset_odometry();
+        odom.pose = INITIAL_POSE;
         pa.reset();
         pb.reset();
 
         float _tinit = time_seconds();
         // Calculate the optimal time so that the vehicle maximizes speed given the profile
         const float tmin = (2000.f * PI) / MAX_SPEED;
-        while (drive.pose.y <= 2000.f) {
+        while (odom.pose.y <= 2000.f) {
             // 0.5 * (EA.get() + EB.get());// Fun force feedbackish!
             float tgt = sin_profile(0.0f, 2000.0f, tmin, time_seconds() - _tinit);
             float out_a = pa.calculate(EA.get(), tgt);
             float out_b = pb.calculate(EB.get(), tgt);
             MA.set(out_a);
             MB.set(out_b);
-            drive.update_odometry();
+            odom.update_odometry();
             printf("%f, %f\n", EA.get(), tgt);
             gpio_put(LED_Y, 1);
             gpio_put(LED_G, 0);
@@ -196,10 +153,8 @@ int main() {
 
         gpio_put(LED_G, 1);
         gpio_put(LED_Y, 0);
-        gpio_put(LED_R, drive.pose.x > 1005.f);
+        gpio_put(LED_R, odom.pose.x > 1005.f);
     }
 
-    while (true) {
-        gpio_put(LED_R, 1);
-    }
+    panic();
 }

@@ -13,7 +13,7 @@
 
 ////////////////// PROGRAM //////////////////
 
-std::array<GridSquare, GRID_H* GRID_W * 2> tmp = {};
+std::array<GridSquare, GRID_H* GRID_W * 4> tmp = {};
 // WARNING: Clobbers `tmp`
 int load_neighbors(GridSquare s) {
 	int e = 0;
@@ -93,7 +93,7 @@ public:
 			}
 		}
 
-		std::cout << "calculate() completed" << std::endl;
+		// std::cout << "calculate() completed" << std::endl;
 	}
 
 	// void print_dists() {
@@ -116,9 +116,9 @@ public:
 		std::copy(GOALS.begin(), GOALS.end(), wpts_tmp.begin());
 		std::sort(wpts_tmp.begin(), wpts_tmp.end());
 
-		// int nperm = 0;
+		int nperm = 0;
 		do {
-			// nperm += 1;
+			nperm += 1;
 			// Calculate distance
 			// (START -> ... -> TARGET)
 			int d = 0;
@@ -130,19 +130,22 @@ public:
 			d += dist[pvi][TARGET.to_i()];
 
 			// Keep track of min
+			// TODO: Also weight paths based on the amount of reverses? (cusps)
 			if (d < min_dist) {
 				min_dist = d;
 				waypoints = wpts_tmp;
 			}
-		} while (std::next_permutation(wpts_tmp.begin(), wpts_tmp.end()));
+			// TODO: Find a reasonable upper permutation bound for the microcontroller, currently this handles <=7 goals
+		} while (std::next_permutation(wpts_tmp.begin(), wpts_tmp.end()) && nperm <= 5040);
 
-		std::cout << "optimize_routes() completed" << std::endl;
+		// std::cout << "optimize_routes() completed! path length: " << min_dist << std::endl;
 	}
 
 	// WARNING: Clobbers `tmp`
 	int load_path(GridSquare from, GridSquare to, int o = 0) {
 		// TODO: Could be optimized by starting at an index determined by
 		// distance... eh? then decrement...
+
 		int n = o;
 
 		int u = from.to_i(), v = to.to_i();
@@ -161,7 +164,7 @@ public:
 
 		// Reverse-in-place
 		std::reverse(tmp.begin() + o, tmp.begin() + n);
-		std::cout << "load_path() completed" << std::endl;
+		// std::cout << "load_path() completed" << std::endl;
 
 		// tmp[n] = to;
 		return n;
@@ -172,6 +175,7 @@ public:
 		int n = 0;
 		GridSquare prev = START;
 		for (GridSquare& sq : waypoints) {
+			// std::cout << "Waypoint: " << sq.x << ", " << sq.y << std::endl;
 			// Add the path that needs to be travelled to get from the prev. square to
 			// the waypoint
 			// Sub 1 from n so that there aren't any duplicate positions.
@@ -182,7 +186,7 @@ public:
 		}
 		// Finish up by going to the end
 		n = load_path(prev, TARGET, n);
-		std::cout << "get_full_path() completed" << std::endl;
+		// std::cout << "get_full_path() completed" << std::endl;
 
 		return n;
 	}
@@ -190,7 +194,7 @@ public:
 
 PathFinding p;
 
-// // TODO: Proper array bounds checking!
+// // FIXME: Proper array bounds checking!
 // int main() {
 // 	p.calculate();
 // 	p.optimize_routes();

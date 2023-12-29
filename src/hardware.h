@@ -8,6 +8,7 @@
 #include "hardware/gpio.h"
 #include "hardware/pio.h"
 #include "quad.pio.h"
+#include "pindefs.h"
 
 class PWMPinWrapper {
 	int pin;

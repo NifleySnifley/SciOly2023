@@ -14,10 +14,15 @@ const float GRIDSQUARE_SIZE_MM = GRID_SIZE_MM / GRID_W;
 
 #ifdef PICO_FLASH_SIZE_BYTES
 #include "pico/time.h"
+#include "pindefs.h"
 #endif
+
 
 template<typename T> T clamp(T mi, T ma, T val) {
 	return (val > ma) ? ma : ((val < mi) ? mi : val);
+}
+template<typename T> T sign(T val) {
+	return (val >= 0) ? ((T)1) : ((T)(-1));
 }
 
 
@@ -30,9 +35,14 @@ template<typename T> T clamp(T mi, T ma, T val) {
   }
 
 void panic() {
-	// while (1) {
-	// }
+#ifdef PICO_FLASH_SIZE_BYTES
+	while (1) {
+		gpio_put(LED_R, 1);
+		sleep_ms(100);
+	}
+#else
 	exit(1);
+#endif
 }
 
 float lerp(float a, float b, float t) {
@@ -74,8 +84,17 @@ public:
 		return Vec2(cosf(theta) * r, sinf(theta) * r);
 	}
 
-	static float distance(Vec2& a, Vec2& b) {
+	static float distance(Vec2 a, Vec2 b) {
 		return (a - b).norm();
+	}
+
+	/// NOTE: Clamps `t` to `[0,1]`
+	static Vec2 lerp(Vec2 a, Vec2 b, float t) {
+		return a + (b - a) * clamp(0.0f, 1.0f, t);
+	}
+
+	static float dot(Vec2 a, Vec2 b) {
+		return (a.x * b.x) + (a.y * b.y);
 	}
 
 	Vec2 normalize() {
@@ -90,22 +109,23 @@ public:
 	// WARNING: Uses `sqrtf()`!
 	// This function should be avoided at all costs
 	float norm() {
-		return 1.0f / q_rsqrt(length_squared());
+		// return 1.0f / q_rsqrt(length_squared());
+		return sqrtf(length_squared());
 	}
 
 	float direction_radians() {
 		return atan2f(y, x);
 	}
 
-	Vec2 operator+(Vec2& other) {
+	Vec2 operator+(Vec2 other) {
 		return Vec2(x + other.x, y + other.y);
 	}
 
-	Vec2 operator-(Vec2& other) {
+	Vec2 operator-(Vec2 other) {
 		return Vec2(x - other.x, y - other.y);
 	}
 
-	Vec2 operator*(Vec2& other) {
+	Vec2 operator*(Vec2 other) {
 		return Vec2(x * other.x, y * other.y);
 	}
 
@@ -119,10 +139,40 @@ public:
 	}
 };
 
-#ifdef PICO_FLASH_SIZE_BYTES
+// inline Vec2 operator+(Vec2 a, Vec2 other) {
+// 	return Vec2(a.x + other.x, a.y + other.y);
+// }
+
+// inline Vec2 operator-(Vec2 a, Vec2 other) {
+// 	return Vec2(a.x - other.x, a.y - other.y);
+// }
+
+// inline Vec2 operator*(Vec2 a, Vec2 other) {
+// 	return Vec2(a.x * other.x, a.y * other.y);
+// }
+
+// inline Vec2 operator*(Vec2 a, float scalar) {
+// 	return Vec2(a.x * scalar, a.y * scalar);
+// }
+
+// inline Vec2 operator/(Vec2 a, float scalar) {
+// 	float s_inv = 1.f / scalar;
+// 	return a * s_inv;
+// }
+
 float time_seconds() {
+#ifdef PICO_FLASH_SIZE_BYTES
 	return (float)(time_us_64()) * (1e-6);
+#else
+	return GetTime();
+#endif
 }
+
+#ifndef PICO_FLASH_SIZE_BYTES
+uint64_t time_us_64() {
+	return (uint64_t)(GetTime() * 1000000.f);
+}
+#endif
 
 class PIDController {
 	float kP, kI, kD;
@@ -167,7 +217,7 @@ public:
 		return calculate(measurement);
 	}
 };
-#endif
+// #endif
 
 
 typedef struct GridSquare {

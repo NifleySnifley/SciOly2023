@@ -22,7 +22,7 @@ set(PROJECT_INCLUDE
 "${CMAKE_CURRENT_LIST_DIR}/"
 "${CMAKE_CURRENT_LIST_DIR}/../src"
 ) # Define PROJECT_INCLUDE to be the path to the include directory of the project
-
+add_definitions(-DDEBUG_GUI)
 # Declaring our executable
 add_executable(${PROJECT_NAME})
 target_sources(${PROJECT_NAME} PRIVATE main.cpp)

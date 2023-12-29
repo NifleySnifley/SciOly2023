@@ -20,7 +20,10 @@
 					"${env:PICO_SDK_DIR}/**",
 					"${workspaceFolder}/**"
 				]
-			}
+			},
+			"defines": [
+				"DEBUG_GUI=1"
+			]
 		}
 	],
 	"version": 4,

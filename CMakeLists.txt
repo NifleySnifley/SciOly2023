@@ -1,13 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 include(pico_sdk_import.cmake)
 
-project(scioly_bot)
+project(scioly_bot C CXX)
 
 pico_sdk_init()
 
 add_executable(scioly_bot
         src/main.cpp
-        src/pathing.cpp
         )
 
 pico_generate_pio_header(scioly_bot ${CMAKE_CURRENT_LIST_DIR}/quad.pio)
