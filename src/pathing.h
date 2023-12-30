@@ -15,7 +15,7 @@ public:
 	std::vector<float> dist_presum;
 
 	BSplinePath(std::vector<Vec2> wpts) {
-		ASSERT_PANIC(wpts.size() >= 4);
+		// ASSERT_PANIC(wpts.size() >= 2);
 
 		waypoints.push_back(wpts[0] - (wpts[1] - wpts[0]));
 		for (Vec2 v : wpts) {
@@ -144,7 +144,11 @@ public:
 	}
 
 	void calculate() {
-		polyline_ize_spline();
+		if (waypoints.size() >= 4) {
+			polyline_ize_spline();
+		} else {
+			pathpoints = waypoints;
+		}
 
 		dist_presum.resize(pathpoints.size());
 

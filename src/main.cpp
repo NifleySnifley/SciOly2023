@@ -16,6 +16,7 @@
 #include "pindefs.h"
 #include "subsystems.h"
 #include "controller.h"
+#include "maze_parser.h"
 
 // TODO: Check!!!
 const float INITIAL_ROTATION = PI / 2.0f;
@@ -89,6 +90,8 @@ int main() {
     ///////////////// Pre-Calculations /////////////////
     gpio_put(LED_B, 1);
 
+    parse_maze();
+
     PathFinding p;
     p.calculate();
     p.optimize_routes();
@@ -111,8 +114,19 @@ int main() {
     gpio_put(LED_B, 0);
 
     while (true) {
-        gpio_put(LED_G, 1);
+        //////////////////// SAFETY INIT BUTTON ////////////////////
+        while (1) {
+            if (!gpio_get(START_BTN)) {
+                sleep_ms(10);
+                if (!gpio_get(START_BTN)) {
+                    break;
+                }
+            }
+            gpio_put(LED_G, (time_us_64() % 1000000) < 500000);
+        }
+        gpio_put(LED_G, 1); // Armed
 
+        //////////////////// TOUCHLESS START ////////////////////
         while (true) {
             // printf("%d, %d\n", ds.get_left_distance(), ds.get_right_distance());
             if ((ds.get_left_distance() < 25) || (ds.get_right_distance() < 25)) {
@@ -123,23 +137,8 @@ int main() {
         }
         gpio_put(LED_G, 0);
 
-        // pa.reset();
-        // pb.reset();
-        // float _tinit = time_seconds();
-        // // Calculate the optimal time so that the vehicle maximizes speed given the profile
-        // const float tmin = (2000.f * PI) / MAX_SPEED;
-        // while (odom.pose.y <= 2000.f) {
-        //     // 0.5 * (EA.get() + EB.get());// Fun force feedbackish!
-        //     float tgt = sin_profile(0.0f, 2000.0f, tmin, time_seconds() - _tinit);
-        //     float out_a = pa.calculate(EA.get(), tgt);
-        //     float out_b = pb.calculate(EB.get(), tgt);
-        //     MA.set(out_a);
-        //     MB.set(out_b);
-        //     odom.update_odometry();
-        //     printf("%f, %f\n", EA.get(), tgt);
-        //     gpio_put(LED_Y, 1);
-        //     gpio_put(LED_G, 0);
-        // }
+
+        //////////////////// CONTROL INIT ////////////////////
 
         EA.set(0.0f);
         EB.set(0.0f);
@@ -168,7 +167,6 @@ int main() {
 
         gpio_put(LED_G, 1);
         gpio_put(LED_Y, 0);
-        // gpio_put(LED_R, odom.pose.x > 1005.f);
     }
 
     panic();

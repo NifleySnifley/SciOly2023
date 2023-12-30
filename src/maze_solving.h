@@ -44,7 +44,9 @@ public:
 	std::array<std::array<int, N_NODES>, N_NODES> dist = {};
 	std::array<std::array<int, N_NODES>, N_NODES> prev = {};
 	// Only has space for the goals
-	std::array<GridSquare, GOALS.max_size()> waypoints;
+	// std::array<GridSquare, GOALS.max_size()> waypoints;
+	std::vector<GridSquare> waypoints;
+
 
 	// TODO: Maybe it would be more memory efficient to use multiple BFS-s?
 	// IDEA: If there is some way to rank paths based on the amount of turns
@@ -52,21 +54,12 @@ public:
 	// robot will take to traverse the path, that could be added as
 	// weights/sorting keys
 	void calculate() {
+		waypoints.resize(GOALS.size());
+
 		// Use floyd-warshall for distances and paths
 
 		std::fill_n(&dist[0][0], dist.size() * dist[0].size(), INT32_MAX / 2);
 		std::fill_n(&prev[0][0], prev.size() * prev[0].size(), -1);
-
-
-		// for (int i = 0; i < prev.size(); ++i) {
-		// 	for (int j = 0; j < prev[i].size(); ++j)
-		// 		prev[i][j] = -1;
-		// }
-
-		// for (int i = 0; i < dist.size(); ++i) {
-		// 	for (int j = 0; j < dist[i].size(); ++j)
-		// 		dist[i][j] = INT32_MAX / 2;
-		// }
 
 		for (int i = 0; i < N_NODES; ++i) {
 			dist[i][i] = 0;
@@ -96,20 +89,13 @@ public:
 		// std::cout << "calculate() completed" << std::endl;
 	}
 
-	// void print_dists() {
-	// 	for (int i = 0; i < N_NODES; ++i) {
-	// 		for (int j = 0; j < N_NODES; ++j) {
-	// 			std::cout << GridSquare(i).to_string() << "->"
-	// 				<< GridSquare(j).to_string() << " = " << dist[i][j]
-	// 				<< std::endl;
-	// 		}
-	// 	}
-	// }
-
-	// N is very   small so using the O(n!) algorithm is good enough, especially
+	// N is very small so using the O(n!) algorithm is good enough, especially
 	// since it finds the ideal solution rather than a good-enough one! N <= 3
 	void optimize_routes() {
-		std::array<GridSquare, GOALS.max_size()> wpts_tmp;
+		// std::array<GridSquare, GOALS.max_size()> wpts_tmp;
+		std::vector<GridSquare> wpts_tmp;
+		wpts_tmp.resize(GOALS.size());
+
 		int min_dist = INT32_MAX;
 
 		// Go through all permutations of the goals
@@ -192,7 +178,7 @@ public:
 	}
 };
 
-PathFinding p;
+// PathFinding p;
 
 // // FIXME: Proper array bounds checking!
 // int main() {

@@ -3,6 +3,7 @@ extern "C" {
 #include "raylib.h"
 }
 #include "utils.h"
+#include "maze_parser.h"
 #include "constants.h"
 #include "maze_solving.h"
 #include "pathing.h"
@@ -30,6 +31,8 @@ void drawWall(Edge edge) {
 int main(void) {
 	SetConfigFlags(FLAG_MSAA_4X_HINT);
 	InitWindow(screenWidth, screenHeight, "SciOly 2024 Robot Tour debug visualizer");
+
+	parse_maze();
 
 	PathFinding p;
 	p.calculate();
