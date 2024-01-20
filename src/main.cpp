@@ -108,7 +108,6 @@ int main() {
 
     PursuitController controller(&path, &odom, &MB, &MA);
 
-    // TODO: Multicore processing?
     sleep_ms(100);
 
     gpio_put(LED_B, 0);
@@ -156,9 +155,19 @@ int main() {
             if (!gpio_get(START_BTN)) {
                 break;
             }
-            // sleep_ms(10);
-            // printf("%.2f, %.2f, %.2f\n", odom.pose.x, odom.pose.y, odom.pose.rotation);
         } while (!controller.execute(Vec2()));
+
+
+        // gpio_put(LED_Y, 1);
+        // while (odom.pose.y < 1000.0f) {
+        //     MA.set(0.3f);
+        //     MB.set(0.3f);
+        //     odom.update_odometry();
+
+        //     if (!gpio_get(START_BTN)) {
+        //         break;
+        //     }
+        // }
 
         /////////////////////////// RUN FINISH ///////////////////////////
 

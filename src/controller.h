@@ -20,6 +20,7 @@ public:
 	Odometry* odom;
 	MotorController* m_left, * m_right;
 	float target_distance = LOOKAHEAD_DIST;
+	float start_time = 0.0f;
 
 	// FIXME: Calibrate for optimal precision to the end goal!
 
@@ -38,6 +39,11 @@ public:
 	const float MIN_THROTTLE = 0.25f;
 	const float SLOWDOWN_THRESH = 400.f;
 
+	// FIXME: This time-control is really bad, especially on cusp points.
+	// Mostly the jerky speed changes are probably bad for odometry.
+	// Need to find a nice elegant solution!
+	PIDController temporal_commander = PIDController(0.01f, 0.001f, 0.0f);
+
 	PursuitController(BSplinePath* path, Odometry* odom, MotorController* left, MotorController* right) : path(path), odom(odom), m_left(left), m_right(right) {
 		reset();
 	}
@@ -53,6 +59,8 @@ public:
 		};
 		m_left->stop();
 		m_right->stop();
+		start_time = time_seconds();
+		temporal_commander.reset();
 	}
 
 	float calculate_throttle() {
@@ -61,7 +69,17 @@ public:
 			dist = std::min(dist, std::abs(path->dist_presum[i] - (target_distance - LOOKAHEAD_DIST)));
 		}
 
-		return clamp(MIN_THROTTLE, MAX_THROTTLE, dist / SLOWDOWN_THRESH);
+		// Stupid temporal control...
+		float percent_done = (time_seconds() - start_time) / TIME_GOAL;
+		float tval = temporal_commander.calculate(target_distance, percent_done * path->total_distance() + END_THRESHOLD + LOOKAHEAD_DIST);
+		float time_factor = clamp(0.01f, 1.0f, tval);
+		std::cout << tval << std::endl;
+
+#ifdef DEBUG_GUI
+		DrawCircleV(robot2screenspace(path->point_at_distance(percent_done * path->total_distance() + LOOKAHEAD_DIST)), 5.0f, GREEN);
+#endif
+
+		return clamp(MIN_THROTTLE, MAX_THROTTLE, (dist / SLOWDOWN_THRESH)) * time_factor;
 	}
 
 	/// Returns `true` on command completion

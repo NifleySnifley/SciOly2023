@@ -188,8 +188,9 @@ public:
 	}
 
 	void reset() {
-		_integral = 0;
+		_integral = 0.f;
 		_fresh = true;
+		_last_ts = time_us_64();
 	}
 
 	float calculate(float measurement) {

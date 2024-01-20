@@ -8,29 +8,34 @@ const char* MAZE_STR = R"(
 +-----_-----+-----_-----+-----_-----+-----_-----+
 |           |           |           |           |
 |           |           |           |           |
-_     _     _     E     W     G     W     _     _
+_     _     _     _     W     _     _     _     _
+|           |           |           |           |
+|           |           |           |           |
++-----_-----+-----_-----+-----_-----+-----_-----+
+|           |           |           |           |
+|           |           |           |           |
+_     G     W     E     _     _     _     _     _
+|           |           |           |           |
+|           |           |           |           |
++-----W-----+-----W-----+-----W-----+-----_-----+
+|           |           |           |           |
+|           |           |           |           |
+_     _     _     _     _     G     W     _     _
 |           |           |           |           |
 |           |           |           |           |
 +-----_-----+-----W-----+-----_-----+-----_-----+
 |           |           |           |           |
 |           |           |           |           |
-_     _     _     _     _     _     _     _     _
-|           |           |           |           |
-|           |           |           |           |
-+-----W-----+-----_-----+-----W-----+-----_-----+
-|           |           |           |           |
-|           |           |           |           |
-_     G     _     _     W     _     _     G     _
-|           |           |           |           |
-|           |           |           |           |
-+-----_-----+-----W-----+-----_-----+-----W-----+
-|           |           |           |           |
-|           |           |           |           |
-_     _     _     S     _     _     _     _     _
+_     _     _     G     W     S     _     _     _
 |           |           |           |           |
 |           |           |           |           |
 +-----_-----+-----_-----+-----_-----+-----_-----+
 )";
+// Time goal, in seconds
+const float TIME_GOAL = 30.0f;
+
+
+
 
 // HARDWARE CONFIGURATION
 const float MOTOR_KHZ = 30.f;
@@ -45,17 +50,20 @@ constexpr float _2PI = 2.0f * PI;
  - Millimeters
  - Radians
 
-   Conventions:
+ Conventions: (Facing "towards" the course)
  - Positive Y is FORWARDS
  - Positive X is LEFT
  - Positive rotation is COUNTERCLOCKWISE, 0 is POSITIVE X
 */
-const float ODOMETRY_CALIBRATION_FAC = 0.98f * 0.9975f * 0.99;
+const float ODOMETRY_CALIBRATION_FAC = 0.989f; //0.98f * 0.9975f * 0.99f;
 const float ENC_COUNT2ROT_FAC = (1.f / 700.f) * ODOMETRY_CALIBRATION_FAC; // Rot/Count
 const float WHEEL_RADIUS = 40.4f / 2.f; // MM
 const float WHEEL_ROT2MM_FAC = 2 * PI * WHEEL_RADIUS; // MM/Rot
-const float WHEELBASE = 83.4f; // MM
+// TODO: Use the math so it's possible to have a rotational calibration factor thats applied after `ODOMETRY_CALIBRATION_FAC`
+const float WHEELBASE = 83.4f / 0.973; // MM
 const float WHEELBASE_2 = WHEELBASE / 2.0f; // MM
+
+const float MEAS_POINT_TO_WHEELBASE = 70.0f;
 
 const float MAX_RPM = 310.0f; // Rot/s
 const float MAX_SPEED = (WHEEL_ROT2MM_FAC * MAX_RPM) / 60.0f; // MM/s
@@ -77,6 +85,6 @@ static std::vector<Edge> WALLS = {};//{ Edge(0,0,0,1), Edge(0,1,1,1), Edge(0,2,1
 static GridSquare TARGET = GridSquare();
 static GridSquare START = GridSquare();
 
-#define START_POS ((Vec2)START.bottom_left_on_field_mm() + Vec2(HALF_CELL.x, 0.0f))
+#define START_POS ((Vec2)START.bottom_left_on_field_mm() + Vec2(HALF_CELL.x, -MEAS_POINT_TO_WHEELBASE))
 
 #endif
