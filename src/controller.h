@@ -42,7 +42,7 @@ public:
 	// FIXME: This time-control is really bad, especially on cusp points.
 	// Mostly the jerky speed changes are probably bad for odometry.
 	// Need to find a nice elegant solution!
-	PIDController temporal_commander = PIDController(0.01f, 0.001f, 0.0f);
+	PIDController temporal_commander = PIDController(0.001f, 0.0001f, 0.0f);
 
 	PursuitController(BSplinePath* path, Odometry* odom, MotorController* left, MotorController* right) : path(path), odom(odom), m_left(left), m_right(right) {
 		reset();

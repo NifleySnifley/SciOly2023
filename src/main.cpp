@@ -150,6 +150,7 @@ int main() {
         gpio_put(LED_Y, 1);
         gpio_put(LED_G, 0);
         gpio_put(LED_B, 0);
+
         do {
             odom.update_odometry();
             if (!gpio_get(START_BTN)) {
@@ -159,9 +160,9 @@ int main() {
 
 
         // gpio_put(LED_Y, 1);
-        // while (odom.pose.y < 1000.0f) {
-        //     MA.set(0.3f);
-        //     MB.set(0.3f);
+        // while (odom.pose.rotation < 2.f * PI * 5) {
+        //     MA.set(0.2f);
+        //     MB.set(-0.2f);
         //     odom.update_odometry();
 
         //     if (!gpio_get(START_BTN)) {

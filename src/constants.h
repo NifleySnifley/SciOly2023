@@ -5,34 +5,34 @@
 #include <vector>
 
 const char* MAZE_STR = R"(
-+-----_-----+-----_-----+-----_-----+-----_-----+
-|           |           |           |           |
-|           |           |           |           |
-_     _     _     _     W     _     _     _     _
-|           |           |           |           |
-|           |           |           |           |
-+-----_-----+-----_-----+-----_-----+-----_-----+
-|           |           |           |           |
-|           |           |           |           |
-_     G     W     E     _     _     _     _     _
-|           |           |           |           |
-|           |           |           |           |
-+-----W-----+-----W-----+-----W-----+-----_-----+
-|           |           |           |           |
-|           |           |           |           |
-_     _     _     _     _     G     W     _     _
-|           |           |           |           |
-|           |           |           |           |
 +-----_-----+-----W-----+-----_-----+-----_-----+
 |           |           |           |           |
 |           |           |           |           |
-_     _     _     G     W     S     _     _     _
+_     G     _     _     W     _     _     G     _
 |           |           |           |           |
 |           |           |           |           |
 +-----_-----+-----_-----+-----_-----+-----_-----+
+|           |           |           |           |
+|           |           |           |           |
+_     _     _     E     _     _     _     _     _
+|           |           |           |           |
+|           |           |           |           |
++-----W-----+-----_-----+-----W-----+-----_-----+
+|           |           |           |           |
+|           |           |           |           |
+_     _     _     _     W     _     _     _     W
+|           |           |           |           |
+|           |           |           |           |
++-----_-----+-----_-----+-----_-----+-----_-----+
+|           |           |           |           |
+|           |           |           |           |
+_     G     _     _     _     _     W     S     _
+|           |           |           |           |
+|           |           |           |           |
++-----_-----+-----W-----+-----_-----+-----_-----+
 )";
 // Time goal, in seconds
-const float TIME_GOAL = 30.0f;
+const float TIME_GOAL = 45.0f;
 
 
 
@@ -55,12 +55,12 @@ constexpr float _2PI = 2.0f * PI;
  - Positive X is LEFT
  - Positive rotation is COUNTERCLOCKWISE, 0 is POSITIVE X
 */
-const float ODOMETRY_CALIBRATION_FAC = 0.989f; //0.98f * 0.9975f * 0.99f;
+const float ODOMETRY_CALIBRATION_FAC = 0.993f; //0.989f; //0.98f * 0.9975f * 0.99f;
 const float ENC_COUNT2ROT_FAC = (1.f / 700.f) * ODOMETRY_CALIBRATION_FAC; // Rot/Count
 const float WHEEL_RADIUS = 40.4f / 2.f; // MM
 const float WHEEL_ROT2MM_FAC = 2 * PI * WHEEL_RADIUS; // MM/Rot
 // TODO: Use the math so it's possible to have a rotational calibration factor thats applied after `ODOMETRY_CALIBRATION_FAC`
-const float WHEELBASE = 83.4f / 0.973; // MM
+const float WHEELBASE = 83.4f / ODOMETRY_CALIBRATION_FAC; // MM
 const float WHEELBASE_2 = WHEELBASE / 2.0f; // MM
 
 const float MEAS_POINT_TO_WHEELBASE = 70.0f;
